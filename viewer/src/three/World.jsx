@@ -455,19 +455,19 @@ function OverviewWorld({ mode }) {
     return () => { el.removeEventListener('pointermove', onMove); el.removeEventListener('dblclick', onDbl) }
   }, [gl, camera, model])
 
-  // Echtes Modell-Zentrum aus der Mesh-Bounding-Box (Y-up gedreht), damit die
-  // Drehung wie ein Drehteller um das Objekt wirkt (nicht die Kamera schwenkt).
-  const meshGltf = useGLTF(model.meshUrl)
+  // Drehteller-Zentrum = Zentrum der AKTIVEN Etage (die Etagen liegen räumlich
+  // versetzt). So sitzt die Kamera immer mittig um die gezeigte Etage.
   const info = useMemo(() => {
-    const s = meshGltf.scene.clone(true)
-    s.rotation.x = -Math.PI / 2
-    s.updateMatrixWorld(true)
-    const box = new THREE.Box3().setFromObject(s)
-    const c = box.getCenter(new THREE.Vector3())
-    const size = box.getSize(new THREE.Vector3())
-    const r = Math.max(size.x, size.z) * 0.6 + 2
+    const sw = model.validSweeps.filter((s) => s.floor === floor)
+    const pts = sw.length ? sw : model.validSweeps
+    const xs = pts.map((s) => s.position.x), ys = pts.map((s) => s.position.y), zs = pts.map((s) => s.position.z)
+    const c = new THREE.Vector3(
+      (Math.min(...xs) + Math.max(...xs)) / 2,
+      (Math.min(...ys) + Math.max(...ys)) / 2 + 1.2,
+      (Math.min(...zs) + Math.max(...zs)) / 2)
+    const r = Math.max(span(xs), span(zs)) * 0.62 + 4
     return { c, r }
-  }, [meshGltf])
+  }, [model, floor])
 
   // Drehteller: Ziel = Modell-Zentrum. Kamera nur einmal beim Betreten setzen,
   // danach steuert der Nutzer frei (Drehen um das Zentrum, Rad = Zoom zum Zentrum).
