@@ -62,7 +62,14 @@ export default function Floorplan() {
   }, [computeFit])
 
   if (!fp || !file) return <div className="fp-msg">Kein Grundriss für diese Etage vorhanden.</div>
-  const url = `/model/${model.id}/floorplan/${file}`
+  // Stapel: aktive Etage opak oben, darunterliegende Etagen zunehmend transparent.
+  const layers = model.floors
+    .filter((f) => f.index <= floor && fp.files[f.id])
+    .map((f) => ({
+      url: `/model/${model.id}/floorplan/${fp.files[f.id]}`,
+      opacity: f.index === floor ? 1 : Math.max(0.12, 0.42 - 0.12 * (floor - f.index - 1)),
+      z: f.index,
+    }))
   const fit = fitRef.current
   const zoomedIn = view && fit && view.s > fit.s * 1.01
 
@@ -99,9 +106,12 @@ export default function Floorplan() {
       onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp}
       onPointerLeave={onUp} onWheel={onWheel}>
       <div className="fp-canvas"
-        style={{ transform: `translate(${v.tx}px, ${v.ty}px) scale(${v.s})` }}>
-        <img className="fp-img" src={url} alt="" draggable={false}
-          style={{ width: fp.width, height: fp.height }} />
+        style={{ transform: `translate(${v.tx}px, ${v.ty}px) scale(${v.s})`,
+                 width: fp.width, height: fp.height }}>
+        {layers.map((l) => (
+          <img key={l.z} className="fp-img" src={l.url} alt="" draggable={false}
+            style={{ width: fp.width, height: fp.height, opacity: l.opacity, zIndex: l.z }} />
+        ))}
         {pts.map(({ s, px, py }) => (
           <button key={s.id}
             className={'fp-dot' + (current && s.id === current.id ? ' cur' : '')}

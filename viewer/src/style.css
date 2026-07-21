@@ -134,11 +134,12 @@ canvas { display: block; touch-action: none; }
 .fp-root.zoomed { cursor: grab; }
 .fp-root.zoomed:active { cursor: grabbing; }
 .fp-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
-.fp-img { display: block; pointer-events: none; image-rendering: auto; }
+.fp-img { position: absolute; top: 0; left: 0; pointer-events: none; image-rendering: auto; }
 .fp-dot {
   position: absolute; width: 22px; height: 22px; border-radius: 50%;
   border: 3px solid #fff; background: var(--accent); cursor: pointer; padding: 0;
   box-shadow: 0 1px 6px rgba(0,0,0,0.5); transition: background 0.12s, transform 0.05s;
+  z-index: 50; /* über den gestapelten Grundriss-Bildern */
 }
 .fp-dot:hover { background: #fff; }
 .fp-dot.cur { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(53,167,255,0.4); }
