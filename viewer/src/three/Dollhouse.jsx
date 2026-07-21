@@ -27,19 +27,14 @@ export default function Dollhouse({ mode, floor }) {
         meshes.push({ mesh: o, cx: c.x, cz: c.z, base: box.min.y })
       }
     })
-    // Zuordnung über den nächstgelegenen Sweep, wobei die AUFSTANDSHÖHE des
-    // Chunks (Unterkante) mit der Etagenhöhe des Sweeps (position.y) verglichen
-    // wird. Nutzt LOKALE Etagenhöhen -> korrekt auch bei Split-Level/Hanglage.
-    const sweeps = model.validSweeps
-    const mf = meshes.map(({ mesh, cx, cz, base }) => {
-      let best = 0, bd = Infinity
-      for (const s2 of sweeps) {
-        const dx = s2.position.x - cx, dz = s2.position.z - cz
-        const dy = s2.position.y - base
-        const d = dx * dx + dz * dz + 3 * dy * dy
-        if (d < bd) { bd = d; best = s2.floor }
-      }
-      return { mesh, floor: best }
+    // Zuordnung über die AUFSTANDSHÖHE (Unterkante): der Chunk gehört zur
+    // höchsten Etage, deren Boden nicht über ihm liegt. So bleibt z.B. die
+    // Decke von Etage 1 bei Etage 1 (statt fälschlich bei Etage 2).
+    const elevs = model.floors.map((f) => f.elevation)
+    const mf = meshes.map(({ mesh, base }) => {
+      let f = 0
+      for (let i = 0; i < elevs.length; i++) if (elevs[i] <= base + 0.6) f = i
+      return { mesh, floor: f }
     })
     return { scene: s, meshFloors: mf }
   }, [gltf, model])
