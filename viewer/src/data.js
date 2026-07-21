@@ -1,8 +1,11 @@
 // Laden & Aufbereiten der Modelldaten (model/<id>/model.json).
 
+// Standard-Modell (Demo). Über ?id=<MODEL_ID> überschreibbar.
+const DEFAULT_MODEL_ID = 'fxbHRAB3nuY'
+
 export function getModelId() {
   const p = new URLSearchParams(location.search)
-  return p.get('id') || p.get('m') || null
+  return p.get('id') || p.get('m') || DEFAULT_MODEL_ID
 }
 
 export function panoBase(id, uuid) {
