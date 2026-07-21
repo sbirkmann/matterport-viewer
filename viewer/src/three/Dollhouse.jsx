@@ -23,9 +23,11 @@ export default function Dollhouse({ mode, floor }) {
     src.updateMatrixWorld(true)
 
     const nFloor = model.floors.length
-    // Etagen-Zuordnung PRO DREIECK über die Höhe (Mittelpunkts-Grenzen zwischen
-    // den Etagen-Basishöhen) — dasselbe Kriterium wie für die Sweeps. Da pro
-    // Dreieck (nicht pro Textur-Chunk) zugeordnet wird, gibt es keine Bleed.
+    // Etagen-Zuordnung PRO DREIECK über die UNTERKANTE (tiefster Punkt): von
+    // unten nach oben aufgebaut — ein Dreieck gehört zu der Etage, auf der es
+    // AUFSTEHT. Eine hohe Wand aus Etage 2, die bis in Etage 3 ragt, hat ihre
+    // Basis in Etage 2 und bleibt dort (kein Ragen in die nächste Etage).
+    // Grenzen = Mittelpunkte der Etagen-Basishöhen (wie bei den Sweeps).
     const bounds = floorBounds(model)
     const floorOf = (y) => { let f = 0; for (const b of bounds) if (y > b) f++; return f }
 
@@ -53,8 +55,7 @@ export default function Dollhouse({ mode, floor }) {
         _a.fromBufferAttribute(pos, ia).applyMatrix4(mw)
         _b.fromBufferAttribute(pos, ib).applyMatrix4(mw)
         _c.fromBufferAttribute(pos, ic).applyMatrix4(mw)
-        const cy = (_a.y + _b.y + _c.y) / 3
-        const f = floorOf(cy)
+        const f = floorOf(Math.min(_a.y, _b.y, _c.y))
         let bucket = perFloor[f].get(texId)
         if (!bucket) { bucket = { pos: [], uv: [], map }; perFloor[f].set(texId, bucket) }
         // Wicklung UMKEHREN (a,c,b): das Mesh ist auswärts gewickelt; gedreht
