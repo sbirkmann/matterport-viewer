@@ -108,6 +108,12 @@ canvas { display: block; touch-action: none; }
 }
 
 /* ---- measurement label ---- */
+.loupe {
+  position: fixed; z-index: 40; width: 156px; height: 156px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.85); box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+  pointer-events: none; background: #0d0f12; transition: opacity 0.1s;
+}
+
 .measure-label {
   background: #0b0d10; color: #fff; padding: 3px 8px; border-radius: 6px;
   font-size: 12px; font-weight: 600; border: 1px solid var(--accent);

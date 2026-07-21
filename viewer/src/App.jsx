@@ -4,6 +4,7 @@ import { store, useStore } from './store.js'
 import { getModelId, loadModel } from './data.js'
 import World from './three/World.jsx'
 import Floorplan from './Floorplan.jsx'
+import Loupe from './Loupe.jsx'
 import { Icon } from './ui/Icon.jsx'
 
 export default function App() {
@@ -71,6 +72,7 @@ function Viewer() {
       </Canvas>
       <img className="pano-fade" id="pano-fade" alt="" />
       <FloorplanLayer />
+      <Loupe />
       <TopBar model={model} />
       <FloorSelector />
       <ModeBar />
@@ -184,7 +186,7 @@ function Tools() {
 function HelpPanel() {
   const { mode, tool } = useStore()
   if (tool === 'measure')
-    return <div className="hud-hint">Messen: zwei Punkte anklicken · ESC beendet</div>
+    return <div className="hud-hint">Messen: Ecken/Kanten anklicken (Snap + Lupe) · ⌫ letzter Punkt · ESC beendet</div>
   const txt = {
     pano: <><b>Rundgang:</b> Ziehen zum Umsehen · auf Boden/Punkt klicken zum Bewegen · Rad = Zoom</>,
     dollhouse: <><b>Dollhouse:</b> Ziehen = drehen · Rad = Zoom · Punkte anklicken</>,

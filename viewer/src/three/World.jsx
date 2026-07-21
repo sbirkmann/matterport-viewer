@@ -283,6 +283,7 @@ function Reticle({ pointer }) {
   const { camera } = useThree()
   const N = useRef(new THREE.Vector3())
   useFrame(() => {
+    if (store.get().tool === 'measure') { if (ref.current) ref.current.visible = false; return }
     const hit = raycastMesh(pointer.current, camera)
     if (hit && ref.current) {
       ref.current.visible = true
