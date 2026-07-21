@@ -65,7 +65,9 @@ function Collider() {
   // ausgeblendet (das WalkMesh übernimmt die Tiefe). Raycast läuft immer.
   return (
     <mesh ref={ref} geometry={geometry} visible={mode === 'pano' && !transition} renderOrder={0}>
-      <meshBasicMaterial colorWrite={false} depthWrite={true} />
+      {/* DoubleSide: Raycast (Cursor/Verdeckung/Messen) trifft die Flächen von
+          innen unabhängig von der Wicklung. */}
+      <meshBasicMaterial colorWrite={false} depthWrite={true} side={THREE.DoubleSide} />
     </mesh>
   )
 }
@@ -319,49 +321,68 @@ function SweepMarkers({ onPick }) {
   const [placed, setPlaced] = useState([])
   const doneFor = useRef(null)
 
-  const sweeps = useMemo(
-    () => model.validSweeps.filter((s) => s.floor === floor),
-    [model, floor])
+  // Sweeps der aktiven Etage + Treppen-Nachbarn auf angrenzenden Etagen,
+  // damit man über Treppen hoch/runter navigieren kann.
+  const sweeps = useMemo(() => {
+    const set = new Map()
+    const onFloor = model.validSweeps.filter((s) => s.floor === floor)
+    onFloor.forEach((s) => set.set(s.id, s))
+    onFloor.forEach((s) => (s.neighbors || []).forEach((nid) => {
+      const nb = model.sweepById[nid]
+      if (nb && nb.uuid && nb.skyboxTemplate && Math.abs(nb.floor - floor) === 1)
+        set.set(nb.id, nb)
+    }))
+    return [...set.values()]
+  }, [model, floor])
 
-  // einmalig pro Etage die Bodenpunkte per Downcast bestimmen (sobald Collider da)
+  // Platzierung (Downcast auf Boden) + Verdeckung (Strahl von der Kamera zum
+  // Punkt; steht eine Wand davor -> ausblenden). Neu berechnet bei Etagen- oder
+  // Sweep-Wechsel (Verdeckung ändert sich nur beim Bewegen, nicht beim Drehen).
   useFrame(() => {
-    const key = floor + ':' + (collider.object ? '1' : '0')
+    const cur = store.get().currentSweep
+    const key = floor + ':' + (cur ? cur.id : '-') + ':' + (collider.object ? '1' : '0')
     if (doneFor.current === key) return
-    if (!collider.object) return
+    if (!collider.object || !cur) return
     doneFor.current = key
     const ray = new THREE.Raycaster()
     const down = new THREE.Vector3(0, -1, 0)
-    const res = sweeps.map((s) => {
+    const eye = new THREE.Vector3(cur.panoPosition.x, cur.panoPosition.y, cur.panoPosition.z)
+    const dir = new THREE.Vector3()
+    const res = []
+    for (const s of sweeps) {
+      if (s.id === cur.id) continue
       const p = s.panoPosition
-      ray.set(new THREE.Vector3(p.x, p.y + 0.2, p.z), down)
-      ray.far = 4
+      ray.set(new THREE.Vector3(p.x, p.y + 0.2, p.z), down); ray.far = 4
       const hit = ray.intersectObject(collider.object, true)
-      const y = hit.length ? hit[0].point.y : s.position.y
-      return { s, x: p.x, y: y + 0.03, z: p.z }
-    })
+      const y = (hit.length ? hit[0].point.y : s.position.y) + 0.03
+      // Sichtlinie prüfen
+      const target = new THREE.Vector3(p.x, y, p.z)
+      dir.copy(target).sub(eye)
+      const dist = dir.length()
+      ray.set(eye, dir.normalize()); ray.far = dist - 0.6
+      if (ray.far > 0.3 && ray.intersectObject(collider.object, true).length) continue
+      res.push({ s, x: p.x, y, z: p.z })
+    }
     setPlaced(res)
   })
 
   return (
     <group>
-      {placed.map(({ s, x, y, z }) => {
-        if (current && s.id === current.id) return null
-        return (
-          <mesh
-            key={s.id}
-            position={[x, y, z]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            onClick={(e) => { e.stopPropagation(); onPick(s) }}
-            onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
-            onPointerOut={() => { document.body.style.cursor = '' }}
-          >
-            <ringGeometry args={[0.1, 0.17, 28]} />
-            {/* depthTest -> hinter Wänden vom Collider verdeckt */}
-            <meshBasicMaterial color="#35a7ff" transparent opacity={0.8}
-              side={THREE.DoubleSide} depthWrite={false} />
-          </mesh>
-        )
-      })}
+      {placed.map(({ s, x, y, z }) => (
+        <mesh
+          key={s.id}
+          position={[x, y, z]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          onClick={(e) => { e.stopPropagation(); onPick(s) }}
+          onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }}
+          onPointerOut={() => { document.body.style.cursor = '' }}
+        >
+          <ringGeometry args={[0.1, 0.17, 28]} />
+          {/* Verdeckte Punkte sind bereits aussortiert -> sichtbare immer zeichnen */}
+          <meshBasicMaterial color="#35a7ff" transparent opacity={0.85}
+            side={THREE.DoubleSide} depthWrite={false} depthTest={false} />
+        </mesh>
+      ))}
     </group>
   )
 }

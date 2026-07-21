@@ -120,13 +120,20 @@ function FloorSelector() {
 }
 
 function selectFloor(model, index) {
-  // beim Etagenwechsel im Pano-Modus zum ersten Sweep der Etage springen
   const s = store.get()
   store.set({ floor: index })
-  if (s.mode === 'pano') {
-    const target = model.validSweeps.find((sw) => sw.floor === index)
-    if (target && target.id !== s.currentSweep?.id) {
-      store.set({ transition: { from: s.currentSweep, to: target, t: 0 } })
+  // Im Rundgang: zum nächstgelegenen Sweep der Zieletage springen
+  if (s.mode === 'pano' && s.currentSweep) {
+    const c = s.currentSweep.position
+    let best = null, bd = Infinity
+    for (const sw of model.validSweeps) {
+      if (sw.floor !== index) continue
+      const dx = sw.position.x - c.x, dz = sw.position.z - c.z
+      const d = dx * dx + dz * dz
+      if (d < bd) { bd = d; best = sw }
+    }
+    if (best && best.id !== s.currentSweep.id) {
+      store.set({ currentSweep: best, transition: null })
     }
   }
 }
