@@ -239,35 +239,70 @@ def build_glb(chunks, texture_files):
     return bytes(out)
 
 
+def _tri_normal(p, a, b, d):
+    ax, ay, az = p[a*3], p[a*3+1], p[a*3+2]
+    bx, by, bz = p[b*3], p[b*3+1], p[b*3+2]
+    dx, dy, dz = p[d*3], p[d*3+1], p[d*3+2]
+    ux, uy, uz = bx-ax, by-ay, bz-az
+    vx, vy, vz = dx-ax, dy-ay, dz-az
+    return (uy*vz - uz*vy, uz*vx - ux*vz, ux*vy - uy*vx,
+            (ax+bx+dx)/3, (ay+by+dy)/3, (az+bz+dz)/3)
+
+
 def reorient_outward(chunks, sweeps):
-    """Vereinheitlicht die Dreiecks-Wicklung: alle Normalen zeigen von den
-    Räumen weg (auswärts), Referenz ist der nächstgelegene Sweep. Erst dadurch
-    funktioniert das sichtabhängige Wände-Ausblenden (BackSide) im Viewer.
-    sweeps: Liste (x,y,z) im ROHEN Modelraum (wie die .dam-Positionen)."""
+    """Vereinheitlicht die Dreiecks-Wicklung pro Chunk über KONNEKTIVITÄT
+    (Flood-Fill): benachbarte Dreiecke müssen die gemeinsame Kante in
+    entgegengesetzter Richtung durchlaufen. Anschließend wird jede
+    zusammenhängende Fläche per Mehrheits-Votum (nächster Sweep) nach AUSSEN
+    gedreht. So sind Wände von beiden Seiten konsistent -> korrektes
+    sichtabhängiges Ausblenden ohne 'falsche Seite'."""
     if not sweeps:
         return 0
+    from collections import defaultdict
     flipped = 0
     for c in chunks:
-        p = c["positions"]; idx = list(c["indices"])
-        for t in range(0, len(idx) - 2, 3):
-            a, b, d = idx[t], idx[t + 1], idx[t + 2]
-            ax, ay, az = p[a*3], p[a*3+1], p[a*3+2]
-            bx, by, bz = p[b*3], p[b*3+1], p[b*3+2]
-            dx, dy, dz = p[d*3], p[d*3+1], p[d*3+2]
-            ux, uy, uz = bx-ax, by-ay, bz-az
-            vx, vy, vz = dx-ax, dy-ay, dz-az
-            nx = uy*vz - uz*vy; ny = uz*vx - ux*vz; nz = ux*vy - uy*vx
-            tx, ty, tz = (ax+bx+dx)/3, (ay+by+dy)/3, (az+bz+dz)/3
-            # nächster Sweep
-            best = None; bd = 1e30
-            for sx, sy, sz in sweeps:
-                dd = (sx-tx)**2 + (sy-ty)**2 + (sz-tz)**2
-                if dd < bd: bd = dd; best = (sx, sy, sz)
-            ox, oy, oz = tx-best[0], ty-best[1], tz-best[2]  # weg vom Raum = auswärts
-            if nx*ox + ny*oy + nz*oz < 0:   # Normale zeigt zum Raum -> umdrehen
-                idx[t+1], idx[t+2] = idx[t+2], idx[t+1]
-                flipped += 1
-        c["indices"] = idx
+        p = c["positions"]
+        idx = c["indices"]
+        ntri = len(idx) // 3
+        tris = [[idx[3*t], idx[3*t+1], idx[3*t+2]] for t in range(ntri)]
+        edge_map = defaultdict(list)
+        for t in range(ntri):
+            a, b, d = tris[t]
+            for u, v in ((a, b), (b, d), (d, a)):
+                edge_map[(u, v) if u < v else (v, u)].append(t)
+        visited = [False] * ntri
+        for seed in range(ntri):
+            if visited[seed]:
+                continue
+            comp = []
+            stack = [seed]; visited[seed] = True
+            while stack:
+                t = stack.pop(); comp.append(t)
+                a, b, d = tris[t]
+                for u, v in ((a, b), (b, d), (d, a)):
+                    key = (u, v) if u < v else (v, u)
+                    for nb in edge_map[key]:
+                        if visited[nb]:
+                            continue
+                        na, nbb, nc = tris[nb]
+                        ndir = ((na, nbb), (nbb, nc), (nc, na))
+                        if (u, v) in ndir:          # gleiche Richtung -> inkonsistent
+                            tris[nb] = [na, nc, nbb]; flipped += 1
+                        visited[nb] = True; stack.append(nb)
+            # Komponente per Votum nach außen drehen
+            vote = 0
+            for t in comp:
+                a, b, d = tris[t]
+                nx, ny, nz, tx, ty, tz = _tri_normal(p, a, b, d)
+                bd = 1e30; ox = oy = oz = 0
+                for sx, sy, sz in sweeps:
+                    dd = (sx-tx)**2 + (sy-ty)**2 + (sz-tz)**2
+                    if dd < bd: bd = dd; ox, oy, oz = tx-sx, ty-sy, tz-sz
+                vote += 1 if (nx*ox + ny*oy + nz*oz) >= 0 else -1
+            if vote < 0:  # Komponente insgesamt nach innen -> alle drehen
+                for t in comp:
+                    a, b, d = tris[t]; tris[t] = [a, d, b]; flipped += 1
+        c["indices"] = [v for t in tris for v in t]
     return flipped
 
 
