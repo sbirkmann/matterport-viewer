@@ -99,6 +99,19 @@ damit **deckungsgleich mit dem Mesh**.
 
 ---
 
+## Deployment
+
+Enthält `Dockerfile` + `deploy/nginx.conf`: baut den Viewer (Vite) und liefert
+den statischen Build **plus die Modelldaten** (`/model`) über nginx aus.
+
+```bash
+docker build -t mpd .
+docker run -p 8080:80 mpd        # http://localhost:8080/?id=fxbHRAB3nuY
+```
+
+Ohne `?id` wird das Standard-Demo-Modell geladen. Für Coolify/Git-Deploy einfach
+das Repo verbinden (Build-Pack: Dockerfile, Port 80).
+
 ## Andere Modelle
 
 ```bash
