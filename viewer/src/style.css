@@ -129,9 +129,10 @@ canvas { display: block; touch-action: none; }
 /* ---- 2D-Grundriss (Floorplan) ---- */
 .fp-root {
   position: fixed; inset: 0; z-index: 12; overflow: hidden;
-  background: var(--bg); cursor: grab; touch-action: none;
+  background: var(--bg); touch-action: none;
 }
-.fp-root:active { cursor: grabbing; }
+.fp-root.zoomed { cursor: grab; }
+.fp-root.zoomed:active { cursor: grabbing; }
 .fp-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 .fp-img { display: block; pointer-events: none; image-rendering: auto; }
 .fp-dot {
