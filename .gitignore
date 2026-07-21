@@ -1,0 +1,10 @@
+# deps / build
+viewer/node_modules/
+viewer/dist/
+# temp
+*.part
+**/.DS_Store
+__pycache__/
+*.pyc
+# scratch
+/tmp/

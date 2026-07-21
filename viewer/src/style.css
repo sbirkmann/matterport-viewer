@@ -1,0 +1,153 @@
+:root {
+  --bg: #0d0f12;
+  --panel: rgba(20, 23, 28, 0.82);
+  --panel-solid: #171a1f;
+  --accent: #35a7ff;
+  --accent-dim: #1d6fb0;
+  --text: #eef1f5;
+  --text-dim: #9aa4b2;
+  --border: rgba(255, 255, 255, 0.09);
+}
+* { box-sizing: border-box; }
+html, body, #root {
+  margin: 0; height: 100%; width: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  overflow: hidden;
+}
+canvas { display: block; touch-action: none; }
+
+.viewer { position: fixed; inset: 0; }
+
+/* ---- Loading / error ---- */
+.center-msg {
+  position: fixed; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 14px; text-align: center;
+}
+.spinner {
+  width: 46px; height: 46px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.15); border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.center-msg .hint { color: var(--text-dim); font-size: 13px; max-width: 460px; }
+.center-msg code { background: #000; padding: 2px 6px; border-radius: 4px; }
+
+/* ---- top bar ---- */
+.topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 52px;
+  display: flex; align-items: center; gap: 14px; padding: 0 16px;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0));
+  pointer-events: none; z-index: 20;
+}
+.topbar .title { font-weight: 600; font-size: 15px; letter-spacing: 0.2px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
+.topbar .sub { color: var(--text-dim); font-size: 12px; }
+
+/* ---- mode switch (bottom center) ---- */
+.modebar {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; padding: 4px; border-radius: 12px;
+  background: var(--panel); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); z-index: 20;
+}
+.modebar button {
+  border: 0; background: transparent; color: var(--text-dim);
+  padding: 9px 15px; border-radius: 9px; cursor: pointer; font-size: 13px;
+  font-weight: 500; display: flex; align-items: center; gap: 7px; transition: 0.15s;
+}
+.modebar button:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.modebar button.active { background: var(--accent); color: #fff; }
+.modebar button svg { width: 16px; height: 16px; }
+
+/* ---- right tool column ---- */
+.tools {
+  position: fixed; top: 66px; right: 16px; display: flex; flex-direction: column;
+  gap: 8px; z-index: 20;
+}
+.tool-btn {
+  width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--panel); backdrop-filter: blur(12px); color: var(--text-dim);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: 0.15s;
+}
+.tool-btn:hover { color: var(--text); }
+.tool-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
+.tool-btn svg { width: 19px; height: 19px; }
+
+/* ---- floor selector (left) ---- */
+.floors {
+  position: fixed; left: 16px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 6px; z-index: 20;
+  padding: 8px; border-radius: 12px; background: var(--panel);
+  backdrop-filter: blur(12px); border: 1px solid var(--border);
+}
+.floors .lbl { font-size: 10px; color: var(--text-dim); text-align: center;
+  text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 2px; }
+.floors button {
+  min-width: 40px; padding: 9px 8px; border-radius: 8px; border: 0; cursor: pointer;
+  background: rgba(255,255,255,0.05); color: var(--text-dim); font-weight: 600;
+  font-size: 14px; transition: 0.15s;
+}
+.floors button:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+.floors button.active { background: var(--accent); color: #fff; }
+
+/* ---- info / help panel ---- */
+.help {
+  position: fixed; bottom: 22px; left: 16px; z-index: 20;
+  background: var(--panel); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+  font-size: 12px; color: var(--text-dim); max-width: 240px; line-height: 1.5;
+}
+.help b { color: var(--text); }
+.hud-hint {
+  position: fixed; bottom: 22px; right: 16px; z-index: 20;
+  background: var(--panel); backdrop-filter: blur(12px);
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px;
+  font-size: 12px; color: var(--accent);
+}
+
+/* ---- measurement label ---- */
+.measure-label {
+  background: #0b0d10; color: #fff; padding: 3px 8px; border-radius: 6px;
+  font-size: 12px; font-weight: 600; border: 1px solid var(--accent);
+  white-space: nowrap; transform: translate(-50%, -140%); pointer-events: none;
+}
+.uv-debug {
+  position: fixed; top: 66px; left: 50%; transform: translateX(-50%); z-index: 30;
+  background: var(--accent); color: #fff; border: 0; border-radius: 9px;
+  padding: 8px 14px; font-size: 13px; cursor: pointer; box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+}
+.uv-debug b { text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ---- 2D-Grundriss (Floorplan) ---- */
+.fp-root {
+  position: fixed; inset: 0; z-index: 12; overflow: hidden;
+  background: var(--bg); cursor: grab; touch-action: none;
+}
+.fp-root:active { cursor: grabbing; }
+.fp-canvas { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.fp-img { display: block; pointer-events: none; image-rendering: auto; }
+.fp-dot {
+  position: absolute; width: 22px; height: 22px; border-radius: 50%;
+  border: 3px solid #fff; background: var(--accent); cursor: pointer; padding: 0;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.5); transition: background 0.12s, transform 0.05s;
+}
+.fp-dot:hover { background: #fff; }
+.fp-dot.cur { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(53,167,255,0.4); }
+.fp-msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim); z-index: 12; background: var(--bg); }
+
+/* Zoom-Crossfade-Overlay: Schnappschuss der alten Ansicht, der beim Wechsel
+   in Richtung Klickpunkt zoomt und über die neue Ansicht ausblendet. */
+.pano-fade {
+  position: fixed; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; pointer-events: none; z-index: 14; will-change: opacity, transform;
+}
+
+.crosshair {
+  position: fixed; top: 50%; left: 50%; width: 6px; height: 6px;
+  border-radius: 50%; background: rgba(255,255,255,0.85);
+  transform: translate(-50%,-50%); pointer-events: none; z-index: 10;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.4);
+}
