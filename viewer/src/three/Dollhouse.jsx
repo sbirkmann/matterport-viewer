@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore } from '../store.js'
 import { floorBounds } from '../data.js'
@@ -16,6 +17,8 @@ import { floorBounds } from '../data.js'
 export default function Dollhouse({ mode, floor }) {
   const model = useStore((s) => s.model)
   const gltf = useGLTF(model.meshUrl)
+  const gl = useThree((s) => s.gl)
+  useEffect(() => { gl.localClippingEnabled = true }, [gl])
 
   const { group, floorMeshes } = useMemo(() => {
     const src = gltf.scene.clone(true)
@@ -67,15 +70,29 @@ export default function Dollhouse({ mode, floor }) {
       }
     }
 
+    // Clip-Ebenen: jede Etage wird HART auf ihr Y-Band beschnitten. Die
+    // Mittelpunkts-Grenzen liegen in der leeren Lücke zwischen Decke einer
+    // Etage und Boden der nächsten -> sauberer Schnitt, kein Ragen zwischen
+    // Etagen (unabhängig davon, wie ein Dreieck zugeordnet wurde).
+    const clipFor = (f) => {
+      const p = []
+      if (f > 0) p.push(new THREE.Plane(new THREE.Vector3(0, 1, 0), -bounds[f - 1]))
+      if (f < nFloor - 1) p.push(new THREE.Plane(new THREE.Vector3(0, -1, 0), bounds[f]))
+      return p
+    }
+
     const group = new THREE.Group()
     const floorMeshes = []
     for (let f = 0; f < nFloor; f++) {
+      const clip = clipFor(f)
       for (const b of perFloor[f].values()) {
         if (!b.pos.length) continue
         const g = new THREE.BufferGeometry()
         g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3))
         if (b.uv.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2))
-        const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: b.map, side: THREE.FrontSide }))
+        const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+          map: b.map, side: THREE.FrontSide, clippingPlanes: clip, clipIntersection: false,
+        }))
         mesh.userData.floor = f
         group.add(mesh)
         floorMeshes.push({ mesh, floor: f, geo: g })
@@ -85,14 +102,13 @@ export default function Dollhouse({ mode, floor }) {
   }, [gltf, model])
 
   useEffect(() => {
-    // Aktive Etage opak, übrige stark abgeschwächt. BackSide blendet
-    // sichtabhängig die vorderen Wände aus (Reinschauen) und aktualisiert
-    // sich beim Drehen automatisch (GPU-Culling nach Blickrichtung).
+    // Aktive Etage opak, übrige dezent halbtransparent (Kontext). FrontSide +
+    // Clipping: pro Etage sauberes Band, nur erfasste Innenseiten, offene Decke.
     for (const { mesh, floor: mfl } of floorMeshes) {
       const active = mfl === floor
       mesh.visible = true
       mesh.material.transparent = !active
-      mesh.material.opacity = active ? 1 : 0.16
+      mesh.material.opacity = active ? 1 : 0.09
       mesh.material.depthWrite = active
       mesh.renderOrder = active ? 0 : 1
     }
