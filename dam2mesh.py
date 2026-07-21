@@ -239,6 +239,53 @@ def build_glb(chunks, texture_files):
     return bytes(out)
 
 
+def reorient_outward(chunks, sweeps):
+    """Vereinheitlicht die Dreiecks-Wicklung: alle Normalen zeigen von den
+    Räumen weg (auswärts), Referenz ist der nächstgelegene Sweep. Erst dadurch
+    funktioniert das sichtabhängige Wände-Ausblenden (BackSide) im Viewer.
+    sweeps: Liste (x,y,z) im ROHEN Modelraum (wie die .dam-Positionen)."""
+    if not sweeps:
+        return 0
+    flipped = 0
+    for c in chunks:
+        p = c["positions"]; idx = list(c["indices"])
+        for t in range(0, len(idx) - 2, 3):
+            a, b, d = idx[t], idx[t + 1], idx[t + 2]
+            ax, ay, az = p[a*3], p[a*3+1], p[a*3+2]
+            bx, by, bz = p[b*3], p[b*3+1], p[b*3+2]
+            dx, dy, dz = p[d*3], p[d*3+1], p[d*3+2]
+            ux, uy, uz = bx-ax, by-ay, bz-az
+            vx, vy, vz = dx-ax, dy-ay, dz-az
+            nx = uy*vz - uz*vy; ny = uz*vx - ux*vz; nz = ux*vy - uy*vx
+            tx, ty, tz = (ax+bx+dx)/3, (ay+by+dy)/3, (az+bz+dz)/3
+            # nächster Sweep
+            best = None; bd = 1e30
+            for sx, sy, sz in sweeps:
+                dd = (sx-tx)**2 + (sy-ty)**2 + (sz-tz)**2
+                if dd < bd: bd = dd; best = (sx, sy, sz)
+            ox, oy, oz = tx-best[0], ty-best[1], tz-best[2]  # weg vom Raum = auswärts
+            if nx*ox + ny*oy + nz*oz < 0:   # Normale zeigt zum Raum -> umdrehen
+                idx[t+1], idx[t+2] = idx[t+2], idx[t+1]
+                flipped += 1
+        c["indices"] = idx
+    return flipped
+
+
+def load_sweeps(mesh_dir):
+    """Sweep-Positionen (roh) aus ../model.json lesen, falls vorhanden."""
+    mj = os.path.join(os.path.dirname(mesh_dir), "model.json")
+    if not os.path.exists(mj):
+        return []
+    m = json.load(open(mj))
+    # model.json-Positionen liegen im selben ROHEN Modelraum wie die .dam-Vertices.
+    out = []
+    for s in m.get("sweeps", []):
+        pos = s.get("panoPosition") or s.get("position")
+        if pos:
+            out.append((pos["x"], pos["y"], pos["z"]))
+    return out
+
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__); sys.exit(1)
@@ -263,6 +310,11 @@ def main():
     textures = [c["texture"] for c in chunks if c["texture"]]
     print(f"  {len(chunks)} Chunks, {nverts} Vertices, {ntris} Dreiecke, "
           f"{len(set(textures))} Texturen.")
+
+    sweeps = load_sweeps(mesh_dir)
+    if sweeps:
+        flipped = reorient_outward(chunks, sweeps)
+        print(f"  Wicklung vereinheitlicht (auswärts): {flipped}/{ntris} Dreiecke gedreht.")
 
     glb = build_glb(chunks, textures)
     out_path = os.path.join(mesh_dir, "dollhouse.glb")
