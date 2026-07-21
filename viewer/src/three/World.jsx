@@ -169,6 +169,10 @@ function PanoWorld() {
     if (s.transition) {
       // Fly-in aus der Übersicht: Kamera-Fahrt in den Zielpunkt
       const tr = s.transition
+      // Blick in Flugrichtung ausrichten (einmalig beim Start des Fly-ins)
+      if (tr.lookLon !== undefined && !tr._lookApplied) {
+        l.lon = tr.lookLon; l.lat = 0; tr._lookApplied = true
+      }
       tr.t = Math.min(1, tr.t + dt / (tr.dur || 0.9))
       const a = tr.fromPos, b = tr.to.panoPosition, e = easeInOut(tr.t)
       camPos = tmp.current.set(
@@ -421,12 +425,15 @@ function OverviewWorld({ mode }) {
   const controls = useRef()
   const ptr = useRef(new THREE.Vector2())
 
-  // Fly-in: aus der Übersicht in den nächstgelegenen Sweep animieren
+  // Fly-in: aus der Übersicht in den Sweep hineinfliegen und den Blick in
+  // Flugrichtung (Kamera -> Zielpunkt) ausrichten.
   const flyTo = (target) => {
     const p = camera.position
+    const dx = target.panoPosition.x - p.x, dz = target.panoPosition.z - p.z
+    const lookLon = Math.atan2(dz, dx) * 180 / Math.PI
     store.set({
       mode: 'pano', floor: target.floor,
-      transition: { fromPos: { x: p.x, y: p.y, z: p.z }, to: target, t: 0, dur: 1.0 },
+      transition: { fromPos: { x: p.x, y: p.y, z: p.z }, to: target, t: 0, dur: 1.1, lookLon },
     })
   }
 
