@@ -3,6 +3,9 @@ import * as THREE from 'three'
 // Geteilter Zustand für Raycasting gegen das (unsichtbare) Mesh.
 export const collider = { geometry: null, object: null }
 
+// Dollhouse-Gruppe (pro-Etage-Meshes mit userData.floor) für Klick-Auswahl.
+export const dollhouse = { group: null }
+
 // Reusable Objekte
 export const _ray = new THREE.Raycaster()
 export const _v2 = new THREE.Vector2()

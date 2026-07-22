@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { useStore } from '../store.js'
+import { dollhouse } from './shared.js'
 
 // Textured Dollhouse-Mesh.
 //
@@ -14,6 +15,7 @@ import { useStore } from '../store.js'
 // Decken werden entfernt (nach oben offen), Texturen unlit (vorbeleuchtet).
 export default function Dollhouse({ mode, floor }) {
   const model = useStore((s) => s.model)
+  const showAll = useStore((s) => s.showAllFloors)
   const gltf = useGLTF(model.meshUrl)
 
   const { group, floorMeshes } = useMemo(() => {
@@ -94,13 +96,14 @@ export default function Dollhouse({ mode, floor }) {
     return { group, floorMeshes }
   }, [gltf, model])
 
+  useEffect(() => { dollhouse.group = group; return () => { if (dollhouse.group === group) dollhouse.group = null } }, [group])
+
   useEffect(() => {
-    // Aktive Etage opak, Etagen DARUNTER schwach halbtransparent (Kontext,
-    // wie beim Grundriss-Stapel), Etagen DARÜBER aus (versperren sonst die
-    // Sicht von oben). FrontSide + Clipping: sauberes Band je Etage.
+    // Standard: aktive Etage opak, DARUNTER schwach halbtransparent (Kontext),
+    // DARÜBER aus (freie Sicht von oben). showAll: alle Etagen voll sichtbar.
     for (const { mesh, floor: mfl } of floorMeshes) {
-      if (mfl > floor) { mesh.visible = false; continue }
-      const active = mfl === floor
+      if (!showAll && mfl > floor) { mesh.visible = false; continue }
+      const active = showAll || mfl === floor
       mesh.visible = true
       const wasTransparent = mesh.material.transparent
       mesh.material.transparent = !active
@@ -110,7 +113,7 @@ export default function Dollhouse({ mode, floor }) {
       // transparent-Flag-Wechsel erfordert Shader-Neubau, sonst bleibt es opak
       if (wasTransparent !== mesh.material.transparent) mesh.material.needsUpdate = true
     }
-  }, [floor, floorMeshes])
+  }, [floor, floorMeshes, showAll])
 
   return <primitive object={group} />
 }

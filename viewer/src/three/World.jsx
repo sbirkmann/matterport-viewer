@@ -5,9 +5,11 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { store, useStore } from '../store.js'
 import { panoBase, nearestSweep } from '../data.js'
-import { collider, raycastMesh } from './shared.js'
+import { collider, raycastMesh, dollhouse } from './shared.js'
 import Dollhouse from './Dollhouse.jsx'
 import Measure from './Measure.jsx'
+
+const _pick = new THREE.Raycaster() // Etagen-Auswahl per Klick im Dollhouse
 
 export default function World() {
   const mode = useStore((s) => s.mode)
@@ -439,20 +441,43 @@ function OverviewWorld({ mode }) {
 
   useEffect(() => {
     const el = gl.domElement
+    let clickTimer = null
     const onMove = (e) => {
       const r = el.getBoundingClientRect()
       ptr.current.set(((e.clientX - r.left) / r.width) * 2 - 1,
                       -((e.clientY - r.top) / r.height) * 2 + 1)
     }
+    // Einfacher Klick auf ein Etagen-Mesh -> diese Etage aktivieren (verzögert,
+    // damit ein Doppelklick zum Hineinfliegen nicht mitfeuert).
+    const onClick = () => {
+      clearTimeout(clickTimer)
+      clickTimer = setTimeout(() => {
+        if (!dollhouse.group) return
+        _pick.setFromCamera(ptr.current, camera)
+        const meshes = dollhouse.group.children.filter((o) => o.visible)
+        const hits = _pick.intersectObjects(meshes, false)
+        if (hits.length) {
+          const f = hits[0].object.userData.floor
+          if (typeof f === 'number' && f !== store.get().floor) store.set({ floor: f })
+        }
+      }, 240)
+    }
     const onDbl = () => {
+      clearTimeout(clickTimer)
       const hit = raycastMesh(ptr.current, camera)
       if (!hit) return
       const t = nearestSweep(model, [hit.point.x, hit.point.y, hit.point.z])
       if (t) flyTo(t)
     }
     el.addEventListener('pointermove', onMove)
+    el.addEventListener('click', onClick)
     el.addEventListener('dblclick', onDbl)
-    return () => { el.removeEventListener('pointermove', onMove); el.removeEventListener('dblclick', onDbl) }
+    return () => {
+      clearTimeout(clickTimer)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('click', onClick)
+      el.removeEventListener('dblclick', onDbl)
+    }
   }, [gl, camera, model])
 
   // Drehteller-Zentrum = Zentrum der AKTIVEN Etage (die Etagen liegen räumlich

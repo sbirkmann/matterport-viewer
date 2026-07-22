@@ -160,7 +160,7 @@ function ModeBar() {
 }
 
 function Tools() {
-  const { tool, showMesh, mode } = useStore()
+  const { tool, showMesh, showAllFloors, mode } = useStore()
   return (
     <div className="tools">
       <button
@@ -179,6 +179,15 @@ function Tools() {
           <Icon name="mesh" />
         </button>
       )}
+      {mode === 'dollhouse' && (
+        <button
+          className={'tool-btn' + (showAllFloors ? ' active' : '')}
+          title={showAllFloors ? 'Nur aktive Etage' : 'Alle Etagen einblenden'}
+          onClick={() => store.set({ showAllFloors: !showAllFloors })}
+        >
+          <Icon name="layers" />
+        </button>
+      )}
     </div>
   )
 }
@@ -189,7 +198,7 @@ function HelpPanel() {
     return <div className="hud-hint">Messen: Ecken/Kanten anklicken (Snap + Lupe) · ⌫ letzter Punkt · ESC beendet</div>
   const txt = {
     pano: <><b>Rundgang:</b> Ziehen zum Umsehen · auf Boden/Punkt klicken zum Bewegen · Rad = Zoom</>,
-    dollhouse: <><b>Dollhouse:</b> Ziehen = drehen · Rad = Zoom · Punkte anklicken</>,
+    dollhouse: <><b>Dollhouse:</b> Ziehen = drehen · Rad = Zoom · Etage anklicken = aktivieren · Doppelklick = hinein</>,
     floorplan: <><b>Grundriss:</b> Draufsicht der Etage · Punkte anklicken</>,
   }[mode]
   return <div className="help">{txt}</div>

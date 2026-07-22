@@ -6,6 +6,7 @@ const P = {
   plan: 'M3 3h18v18H3zM3 10h18M10 10v11',
   ruler: 'M4 16L16 4l4 4L8 20zM8 12l2 2M12 8l2 2M6 14l1 1',
   mesh: 'M12 2l9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10M7.5 4.5l9 5M16.5 4.5l-9 5',
+  layers: 'M12 2l9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5',
 }
 
 export function Icon({ name }) {

@@ -11,6 +11,7 @@ let state = {
   currentSweep: null,   // aktueller Sweep (Objekt) im Pano-Modus
   tool: null,           // null | 'measure'
   showMesh: false,      // Mesh im Pano sichtbar (Debug/Overlay)
+  showAllFloors: false, // Dollhouse: alle Etagen einblenden statt nur aktive
   transition: null,     // {from, to, t}  laufende Navigation
   hoverPoint: null,     // [x,y,z] Cursor-Treffer auf Oberfläche
 }
