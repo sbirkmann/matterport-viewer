@@ -6,6 +6,8 @@ import path from 'node:path'
 // eingebunden. fs.allow muss das Repo-Root umfassen.
 export default defineConfig({
   plugins: [react()],
+  // three-mesh-bvh muss dieselbe three-Instanz wie die App nutzen
+  resolve: { dedupe: ['three'] },
   server: {
     fs: { allow: [path.resolve(__dirname, '..')] },
     host: true,
