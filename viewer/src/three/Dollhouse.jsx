@@ -99,10 +99,9 @@ export default function Dollhouse({ mode, floor }) {
   useEffect(() => { dollhouse.group = group; return () => { if (dollhouse.group === group) dollhouse.group = null } }, [group])
 
   useEffect(() => {
-    // Standard: aktive Etage opak, DARUNTER schwach halbtransparent (Kontext),
-    // DARÜBER aus (freie Sicht von oben). showAll: alle Etagen voll sichtbar.
+    // Aktive Etage opak, alle anderen (darunter UND darüber) schwach
+    // halbtransparent. showAll: alle Etagen voll sichtbar.
     for (const { mesh, floor: mfl } of floorMeshes) {
-      if (!showAll && mfl > floor) { mesh.visible = false; continue }
       const active = showAll || mfl === floor
       mesh.visible = true
       const wasTransparent = mesh.material.transparent
