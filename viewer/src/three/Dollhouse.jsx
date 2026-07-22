@@ -20,7 +20,7 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast
 // weil der geometrisch näher (durch die Decke hindurch) liegt.
 //
 // Decken werden entfernt (nach oben offen), Texturen unlit (vorbeleuchtet).
-const K = 8 // Anzahl nächster Sweeps, die per Sichtlinie geprüft werden
+const K = 14 // Anzahl nächster Sweeps, die per Sichtlinie geprüft werden
 
 export default function Dollhouse({ mode, floor }) {
   const model = useStore((s) => s.model)
@@ -93,9 +93,11 @@ export default function Dollhouse({ mode, floor }) {
     const _o = new THREE.Vector3(), _d = new THREE.Vector3()
     const cand = new Int32Array(K), candD = new Float32Array(K)
 
-    // Etage eines Dreiecks = nächster Sweep MIT freier Sichtlinie (sonst weiter
-    // suchen). Fällt auf den geometrisch nächsten zurück, wenn keiner frei ist.
-    const floorOfTri = (cx, cy, cz) => {
+    // Etagen eines Dreiecks = ALLE Etagen, von denen aus es ein Sweep OHNE
+    // Hindernis sieht (freie Sichtlinie). Besonderheit: sieht man es von zwei
+    // Etagen (z.B. Treppenhaus-/Luftraum-Wand), gehört es zu BEIDEN. Ergebnis
+    // als Bitmaske; Rückfall auf den geometrisch nächsten, wenn keiner frei ist.
+    const floorsMaskOfTri = (cx, cy, cz) => {
       for (let j = 0; j < K; j++) candD[j] = Infinity
       for (let i = 0; i < N; i++) {
         const dx = SX[i] - cx, dy = SY[i] - cy, dz = SZ[i] - cz
@@ -106,28 +108,34 @@ export default function Dollhouse({ mode, floor }) {
           candD[j] = d; cand[j] = i
         }
       }
+      let mask = 0
       for (let k = 0; k < K; k++) {
         if (candD[k] === Infinity) break
-        const i = cand[k], dist = Math.sqrt(candD[k])
+        const i = cand[k], f = SF[i]
+        if (mask & (1 << f)) continue // diese Etage schon bestätigt
+        const dist = Math.sqrt(candD[k])
         _d.set((SX[i] - cx) / dist, (SY[i] - cy) / dist, (SZ[i] - cz) / dist)
         _o.set(cx + _d.x * 0.06, cy + _d.y * 0.06, cz + _d.z * 0.06)
         ray.set(_o, _d); ray.near = 0; ray.far = dist - 0.14
-        if (ray.intersectObject(losMesh, false).length === 0) return SF[i] // freie Sicht
+        if (ray.intersectObject(losMesh, false).length === 0) mask |= (1 << f) // freie Sicht
       }
-      return SF[cand[0]] // Rückfall: geometrisch nächster
+      return mask || (1 << SF[cand[0]]) // Rückfall: geometrisch nächster
     }
 
-    // Pass 2: pro Etage nach Textur einsortieren (Wicklung a,c,b -> FrontSide
-    // zeigt die erfasste Innenseite; keine texturlosen Rückseiten).
+    // Pass 2: pro (sichtbarer) Etage nach Textur einsortieren. Ein von zwei
+    // Etagen sichtbares Dreieck wird in BEIDE einsortiert.
     const perFloor = Array.from({ length: nFloor }, () => new Map()) // texIndex -> {pos:[],uv:[]}
     for (let i = 0; i < total; i++) {
-      const f = floorOfTri(CX[i], CY[i], CZ[i])
+      const mask = floorsMaskOfTri(CX[i], CY[i], CZ[i])
       const mi = TTEX[i]
-      let bucket = perFloor[f].get(mi)
-      if (!bucket) { bucket = { pos: [], uv: [] }; perFloor[f].set(mi, bucket) }
       const p = i * 9, u = i * 6
-      bucket.pos.push(TP[p], TP[p + 1], TP[p + 2], TP[p + 6], TP[p + 7], TP[p + 8], TP[p + 3], TP[p + 4], TP[p + 5])
-      bucket.uv.push(TUV[u], TUV[u + 1], TUV[u + 4], TUV[u + 5], TUV[u + 2], TUV[u + 3])
+      for (let f = 0; f < nFloor; f++) {
+        if (!(mask & (1 << f))) continue
+        let bucket = perFloor[f].get(mi)
+        if (!bucket) { bucket = { pos: [], uv: [] }; perFloor[f].set(mi, bucket) }
+        bucket.pos.push(TP[p], TP[p + 1], TP[p + 2], TP[p + 6], TP[p + 7], TP[p + 8], TP[p + 3], TP[p + 4], TP[p + 5])
+        bucket.uv.push(TUV[u], TUV[u + 1], TUV[u + 4], TUV[u + 5], TUV[u + 2], TUV[u + 3])
+      }
     }
     losGeo.disposeBoundsTree()
 
