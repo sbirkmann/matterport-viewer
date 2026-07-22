@@ -109,10 +109,13 @@ export default function Dollhouse({ mode, floor }) {
       if (mfl > floor) { mesh.visible = false; continue }
       const active = mfl === floor
       mesh.visible = true
+      const wasTransparent = mesh.material.transparent
       mesh.material.transparent = !active
       mesh.material.opacity = active ? 1 : 0.14
       mesh.material.depthWrite = active
       mesh.renderOrder = active ? 0 : 1
+      // transparent-Flag-Wechsel erfordert Shader-Neubau, sonst bleibt es opak
+      if (wasTransparent !== mesh.material.transparent) mesh.material.needsUpdate = true
     }
   }, [floor, floorMeshes])
 
