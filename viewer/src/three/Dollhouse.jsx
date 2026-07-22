@@ -102,13 +102,15 @@ export default function Dollhouse({ mode, floor }) {
   }, [gltf, model])
 
   useEffect(() => {
-    // Aktive Etage opak, übrige dezent halbtransparent (Kontext). FrontSide +
-    // Clipping: pro Etage sauberes Band, nur erfasste Innenseiten, offene Decke.
+    // Aktive Etage opak, Etagen DARUNTER schwach halbtransparent (Kontext,
+    // wie beim Grundriss-Stapel), Etagen DARÜBER aus (versperren sonst die
+    // Sicht von oben). FrontSide + Clipping: sauberes Band je Etage.
     for (const { mesh, floor: mfl } of floorMeshes) {
+      if (mfl > floor) { mesh.visible = false; continue }
       const active = mfl === floor
       mesh.visible = true
       mesh.material.transparent = !active
-      mesh.material.opacity = active ? 1 : 0.09
+      mesh.material.opacity = active ? 1 : 0.14
       mesh.material.depthWrite = active
       mesh.renderOrder = active ? 0 : 1
     }
