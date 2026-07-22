@@ -1,9 +1,7 @@
 import React, { useEffect, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
-import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useStore } from '../store.js'
-import { floorBounds } from '../data.js'
 
 // Textured Dollhouse-Mesh.
 //
@@ -17,8 +15,6 @@ import { floorBounds } from '../data.js'
 export default function Dollhouse({ mode, floor }) {
   const model = useStore((s) => s.model)
   const gltf = useGLTF(model.meshUrl)
-  const gl = useThree((s) => s.gl)
-  useEffect(() => { gl.localClippingEnabled = true }, [gl])
 
   const { group, floorMeshes } = useMemo(() => {
     const src = gltf.scene.clone(true)
@@ -26,13 +22,24 @@ export default function Dollhouse({ mode, floor }) {
     src.updateMatrixWorld(true)
 
     const nFloor = model.floors.length
-    // Etagen-Zuordnung PRO DREIECK über die UNTERKANTE (tiefster Punkt): von
-    // unten nach oben aufgebaut — ein Dreieck gehört zu der Etage, auf der es
-    // AUFSTEHT. Eine hohe Wand aus Etage 2, die bis in Etage 3 ragt, hat ihre
-    // Basis in Etage 2 und bleibt dort (kein Ragen in die nächste Etage).
-    // Grenzen = Mittelpunkte der Etagen-Basishöhen (wie bei den Sweeps).
-    const bounds = floorBounds(model)
-    const floorOf = (y) => { let f = 0; for (const b of bounds) if (y > b) f++; return f }
+    // RAUM-basierte Zuordnung: jedes Dreieck gehört zu der Etage seines
+    // NÄCHSTEN Sweeps (die Aufnahmepunkte tragen Matterports Raum-/Etagen-
+    // Labels). Ein hoher Raum aus Etage 2 wird komplett Etage 2 zugeordnet und
+    // NICHT am Etagenband abgeschnitten — über einem Doppelhöhen-Raum gibt es
+    // keine Sweeps der darüberliegenden Etage, daher bleibt seine Decke bei 2.
+    const sw = model.validSweeps
+    const N = sw.length
+    const SX = new Float32Array(N), SY = new Float32Array(N), SZ = new Float32Array(N), SF = new Int32Array(N)
+    sw.forEach((s, i) => { const p = s.panoPosition; SX[i] = p.x; SY[i] = p.y; SZ[i] = p.z; SF[i] = s.floor })
+    const nearestFloor = (x, y, z) => {
+      let best = 0, bd = Infinity
+      for (let i = 0; i < N; i++) {
+        const dx = SX[i] - x, dy = SY[i] - y, dz = SZ[i] - z
+        const d = dx * dx + dy * dy + dz * dz
+        if (d < bd) { bd = d; best = SF[i] }
+      }
+      return best
+    }
 
     const chunks = []
     src.traverse((o) => { if (o.isMesh) chunks.push(o) })
@@ -58,7 +65,7 @@ export default function Dollhouse({ mode, floor }) {
         _a.fromBufferAttribute(pos, ia).applyMatrix4(mw)
         _b.fromBufferAttribute(pos, ib).applyMatrix4(mw)
         _c.fromBufferAttribute(pos, ic).applyMatrix4(mw)
-        const f = floorOf(Math.min(_a.y, _b.y, _c.y))
+        const f = nearestFloor((_a.x + _b.x + _c.x) / 3, (_a.y + _b.y + _c.y) / 3, (_a.z + _b.z + _c.z) / 3)
         let bucket = perFloor[f].get(texId)
         if (!bucket) { bucket = { pos: [], uv: [], map }; perFloor[f].set(texId, bucket) }
         // Wicklung UMKEHREN (a,c,b): das Mesh ist auswärts gewickelt; gedreht
@@ -70,29 +77,15 @@ export default function Dollhouse({ mode, floor }) {
       }
     }
 
-    // Clip-Ebenen: jede Etage wird HART auf ihr Y-Band beschnitten. Die
-    // Mittelpunkts-Grenzen liegen in der leeren Lücke zwischen Decke einer
-    // Etage und Boden der nächsten -> sauberer Schnitt, kein Ragen zwischen
-    // Etagen (unabhängig davon, wie ein Dreieck zugeordnet wurde).
-    const clipFor = (f) => {
-      const p = []
-      if (f > 0) p.push(new THREE.Plane(new THREE.Vector3(0, 1, 0), -bounds[f - 1]))
-      if (f < nFloor - 1) p.push(new THREE.Plane(new THREE.Vector3(0, -1, 0), bounds[f]))
-      return p
-    }
-
     const group = new THREE.Group()
     const floorMeshes = []
     for (let f = 0; f < nFloor; f++) {
-      const clip = clipFor(f)
       for (const b of perFloor[f].values()) {
         if (!b.pos.length) continue
         const g = new THREE.BufferGeometry()
         g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3))
         if (b.uv.length) g.setAttribute('uv', new THREE.Float32BufferAttribute(b.uv, 2))
-        const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({
-          map: b.map, side: THREE.FrontSide, clippingPlanes: clip, clipIntersection: false,
-        }))
+        const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ map: b.map, side: THREE.FrontSide }))
         mesh.userData.floor = f
         group.add(mesh)
         floorMeshes.push({ mesh, floor: f, geo: g })
